@@ -15,10 +15,11 @@ class DashboardController extends Controller
             : '24h';
 
         $client = new Client([
-            'url'    => config('influxdb.url'),
-            'token'  => config('influxdb.token'),
-            'org'    => config('influxdb.org'),
-            'bucket' => config('influxdb.bucket'),
+            'url'     => config('influxdb.url'),
+            'token'   => config('influxdb.token'),
+            'org'     => config('influxdb.org'),
+            'bucket'  => config('influxdb.bucket'),
+            'timeout' => 10,
         ]);
 
         $queryApi = $client->createQueryApi();
@@ -28,17 +29,16 @@ class DashboardController extends Controller
         $fluxCurrent = <<<FLUX
 from(bucket: "{$bucket}")
   |> range(start: -1h)
-  |> filter(fn: (r) => r._measurement == "sensor_logs")
-  |> filter(fn: (r) => r._field == "suhu" or r._field == "status")
+  |> filter(fn: (r) => r._measurement == "msg.payload.suhu")
   |> last()
-  |> pivot(rowKey: ["_time", "device_id", "unit"], columnKey: ["_field"], valueColumn: "_value")
+  |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
 FLUX;
 
         // Query B: historical aggregated per 5-min window
         $fluxHistory = <<<FLUX
 from(bucket: "{$bucket}")
   |> range(start: -{$range})
-  |> filter(fn: (r) => r._measurement == "sensor_logs" and r._field == "suhu")
+  |> filter(fn: (r) => r._measurement == "msg.payload.suhu" and r._field == "suhu")
   |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)
   |> keep(columns: ["_time", "_value"])
 FLUX;
