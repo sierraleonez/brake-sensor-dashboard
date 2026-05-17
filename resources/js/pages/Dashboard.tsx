@@ -17,9 +17,18 @@ interface HistoryPoint {
     value: number | null;
 }
 
+interface LogEntry {
+    time: string;
+    device_id: string;
+    suhu: number | null;
+    status: string;
+    unit: string;
+}
+
 interface Props {
     current: CurrentState | null;
     history: HistoryPoint[];
+    logs: LogEntry[];
     range: string;
 }
 
@@ -86,12 +95,12 @@ const fmtTick = (t: string) => {
 };
 
 export default function Dashboard() {
-    const { current, history, range } = usePage<Props>().props;
+    const { current, history, logs, range } = usePage<Props>().props;
     const [tab, setTab] = useState<'gauge' | 'chart'>('gauge');
     const status: SensorStatus = (current?.status as SensorStatus) ?? 'AMAN';
 
     useEffect(() => {
-        const id = setInterval(() => router.reload({ only: ['current', 'history'] }), 3000);
+        const id = setInterval(() => router.reload({ only: ['current', 'history', 'logs'] }), 3000);
         return () => clearInterval(id);
     }, []);
 
@@ -187,6 +196,52 @@ export default function Dashboard() {
                                     </AreaChart>
                                 </ResponsiveContainer>
                             )}
+                        </div>
+                    )}
+                </div>
+                {/* Data logs table */}
+                <div className="rounded-xl border border-slate-700 bg-slate-900 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-700">
+                        <h2 className="text-sm font-semibold text-slate-300">Data Logs</h2>
+                    </div>
+                    {logs.length === 0 ? (
+                        <div className="flex h-24 items-center justify-center text-slate-500 text-sm">
+                            No log data available.
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-slate-700 text-left text-xs text-slate-500">
+                                        <th className="px-4 py-2">Time</th>
+                                        <th className="px-4 py-2">Device ID</th>
+                                        <th className="px-4 py-2">Suhu</th>
+                                        <th className="px-4 py-2">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {logs.map((row, i) => (
+                                        <tr key={i} className="border-b border-slate-800 hover:bg-slate-800/50">
+                                            <td className="px-4 py-2 text-slate-400 whitespace-nowrap">
+                                                {new Date(row.time).toLocaleString()}
+                                            </td>
+                                            <td className="px-4 py-2 font-mono text-slate-300">{row.device_id}</td>
+                                            <td className="px-4 py-2 text-slate-300">
+                                                {row.suhu !== null ? `${row.suhu.toFixed(2)} °${row.unit}` : '—'}
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                                    row.status === 'BAHAYA'     ? 'bg-red-500/20 text-red-400' :
+                                                    row.status === 'PERINGATAN' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                                                  'bg-green-500/20 text-green-400'
+                                                }`}>
+                                                    {row.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     )}
                 </div>

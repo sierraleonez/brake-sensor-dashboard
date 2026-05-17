@@ -43,8 +43,20 @@ from(bucket: "{$bucket}")
   |> keep(columns: ["_time", "_value"])
 FLUX;
 
+        // Query C: raw event log, last 50 newest first
+        $measurement = "msg.payload.suhu";
+        $fluxLogs = <<<FLUX
+from(bucket: "{$bucket}")
+  |> range(start: -24h)
+  |> filter(fn: (r) => r._measurement == "{$measurement}")
+  |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+  |> sort(columns: ["_time"], desc: true)
+  |> limit(n: 50)
+FLUX;
+
         $current = null;
         $history = [];
+        $logs = [];
 
         try {
             $currentResult = $queryApi->query($fluxCurrent);
@@ -72,6 +84,19 @@ FLUX;
                     ];
                 }
             }
+
+            $logsResult = $queryApi->query($fluxLogs);
+            foreach ($logsResult as $table) {
+                foreach ($table->records as $record) {
+                    $logs[] = [
+                        'time'      => (string) $record->values['_time'],
+                        'device_id' => $record->values['device_id'] ?? '—',
+                        'suhu'      => isset($record->values['suhu']) ? (float) $record->values['suhu'] : null,
+                        'status'    => $record->values['status'] ?? '—',
+                        'unit'      => $record->values['unit'] ?? 'C',
+                    ];
+                }
+            }
         } catch (\Exception $e) {
             logger()->error('InfluxDB query failed: '.$e->getMessage());
         }
@@ -81,6 +106,7 @@ FLUX;
         return Inertia::render('Dashboard', [
             'current' => $current,
             'history' => $history,
+            'logs'    => $logs,
             'range'   => $range,
         ]);
     }
